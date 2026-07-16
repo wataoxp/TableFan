@@ -53,22 +53,30 @@ int main(void)
 	DMA dma(DMA1);
 	DMA_Config(dma, LL_DMA_CHANNEL_1, LL_DMAMUX_REQ_TIM3_UP, (uint32_t*)pixel.GetBufferAddress(), (uint32_t*)&(TIM3->CCR1));
 
-	TIM pwm(TIM14);
+	TIM pwm(TimerParameter::PWMTimer);
 	ConfigPWM(pwm,obj.Duty);
+	// PWM制御ピンはオープンドレイン
+	GPIO pwmPin(TimerParameter::PWMPort,IOPin::PWMoutPos);
+	pwmPin.SetParameter(LL_GPIO_PULL_NO, LL_GPIO_MODE_ALTERNATE, LL_GPIO_SPEED_FREQ_LOW, LL_GPIO_OUTPUT_OPENDRAIN);
+	pwmPin.OutputInit();
 
-	TIM Sampling(TIM16);
-	ConfigSamplingTimer(Sampling, TIM16);
+	TIM Sampling(TimerParameter::SamplingTimer);
+	ConfigSamplingTimer(Sampling, TimerParameter::SamplingTimer);
 
 	ConfigInput();
 	ConfigOutput();
 
 	AnalogConverter adc(ADC1);
 	ADC_Config(ADC1, adc, LL_ADC_CHANNEL_3, GPIOA, IOPin::ADCinPos, Delay);
+
+	// PWMが動作してからロードスイッチをONにする。電源もシステムで管理する
 	SwitchOn();
 
 	while(1)
 	{
 		SleepMode(obj.VoltageFlag);
+
+		obj.IdleCount = 0;
 
 		while(iFlag.ExtCommand == 0 && iFlag.IntCommand == 0)
 		{
@@ -105,13 +113,18 @@ int main(void)
 			}
 		}
 
-		obj.IdleCount = 0;
-
 		if(obj.LedFlag)
 		{
 			SendData(dma, pixel, Delay);
 		}
-		while(iFlag.ExtCommand != 0);
+
+		obj.IdleCount = 0;
+
+		while(iFlag.ExtCommand != 0)
+		{
+			if(LL_SYSTICK_IsActiveCounterFlag()) obj.IdleCount++;
+			if(obj.IdleCount > SystemUnits::GetIdleTimeMillLimit()) break;
+		}
 	}
 }
 
@@ -146,3 +159,77 @@ void AdcValueView(SO1602& lcd,uint16_t value,char* string,uint32_t length)
 	lcd.PointClear(0);
 	lcd.StringLCD(string, length);
 }
+
+#if 0
+
+// 工事中、最下部に元の処理がある
+if(iFlag.IntCommand)
+{
+	if(iFlag.IntCommand == 1)
+	{
+		obj.VoltageFlag = CheckVoltage(adc);
+	}
+	// システムのON/OFFを検出するために両エッジ割り込みとする
+	else if(iFlag.IntCommand == (1 << 1))
+	{
+		SwitchOff();
+	}
+
+	ResetIntCommand();
+}
+while(1)
+{
+	SleepMode(obj.VoltageFlag);
+
+	obj.IdleCount = 0;
+
+	while(iFlag.ExtCommand == 0 && iFlag.IntCommand == 0)
+	{
+		if(LL_SYSTICK_IsActiveCounterFlag()) obj.IdleCount++;
+		if(obj.IdleCount > SystemUnits::GetIdleTimeMillLimit()) break;
+	}
+
+	if(iFlag.ExtCommand)
+	{
+		if(iFlag.ExtCommand == IOPin::LedEnable)
+		{
+			LedMode(Sampling, &obj, dma, pixel, Delay);
+		}
+		else
+		{
+			obj.Duty = GetNewDuty(iFlag.ExtCommand);
+			pwm.SetCH1CompareValue(obj.Duty);
+		}
+	}
+	if(iFlag.IntCommand)
+	{
+		ResetIntCommand();
+		obj.adcValue = adc.StartSoftConvert();
+
+		if(obj.adcValue < SystemUnits::GetUnderVoltageLimit())
+		{
+			obj.VoltageFlag = false;
+			SwitchOff();
+		}
+		else
+		{
+			obj.VoltageFlag = true;
+			SwitchOn();
+		}
+	}
+
+	if(obj.LedFlag)
+	{
+		SendData(dma, pixel, Delay);
+	}
+
+	obj.IdleCount = 0;
+
+	while(iFlag.ExtCommand != 0)
+	{
+		if(LL_SYSTICK_IsActiveCounterFlag()) obj.IdleCount++;
+		if(obj.IdleCount > SystemUnits::GetIdleTimeMillLimit()) break;
+	}
+}
+}
+#endif

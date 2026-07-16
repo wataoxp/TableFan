@@ -43,12 +43,21 @@ void SysTick_Handler(void)
 	Debounce::ButtonFilter(iFlag.ExtCommand);
 }
 
-void TIM16_IRQHandler(void)
+void TIM14_IRQHandler(void)
 {
-	if(LL_TIM_IsActiveFlag_UPDATE(TIM16))
+	if(LL_TIM_IsActiveFlag_UPDATE(TIM14))
 	{
-		LL_TIM_ClearFlag_UPDATE(TIM16);
+		LL_TIM_ClearFlag_UPDATE(TIM14);
 		iFlag.IntCommand |= 1;
+	}
+}
+
+void EXTI4_15_IRQHandler(void)
+{
+	if(LL_EXTI_IsActiveFallingFlag_0_31(LL_EXTI_LINE_7))
+	{
+		LL_EXTI_ClearFallingFlag_0_31(LL_EXTI_LINE_7);
+		iFlag.IntCommand |= 1 << 1;
 	}
 }
 

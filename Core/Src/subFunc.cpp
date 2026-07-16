@@ -16,7 +16,7 @@ uint32_t ConfigPWM(TIM& tim,uint32_t duty)
 	uint32_t ret = 0;
 
 	TIM_Config(tim, PWM::Prescaler, PWM::Reload);
-	ret = PWM_Config(tim, GPIOA, IOPin::PWMoutPos, IOPin::PWMoutAF, LL_TIM_CHANNEL_CH1, LL_TIM_OCMODE_PWM1);
+	ret = PWM_Config(tim, GPIOB, IOPin::PWMoutPos, IOPin::PWMoutAF, LL_TIM_CHANNEL_CH1, LL_TIM_OCMODE_PWM1);
 	tim.SetCH1CompareValue(duty);
 	tim.EnableTimer();
 	tim.EnablePulse(LL_TIM_CHANNEL_CH1);
@@ -32,8 +32,8 @@ void ConfigSamplingTimer(TIM& tim,TIM_TypeDef* pTIM)
 
 	LL_TIM_EnableIT_UPDATE(pTIM);
 
-	__NVIC_SetPriority(TIM16_IRQn, 1);
-	__NVIC_EnableIRQ(TIM16_IRQn);
+	__NVIC_SetPriority(TIM14_IRQn, 1);
+	__NVIC_EnableIRQ(TIM14_IRQn);
 
 	tim.EnableTimer();
 }
@@ -51,11 +51,14 @@ uint32_t ConfigInput()
 
 	ret += EXTI_Config(GPIOA, IOPin::LedEnablePos, Pull, Mode, Trigger);
 
+	// システム電源管理 PC14?を使う
+//	ret += EXTI_Config(GPIOB, IOPin::SystemPos, Pull, LL_EXTI_MODE_IT, Trigger);
+
 //	__NVIC_SetPriority(EXTI2_3_IRQn, 0);
 //	__NVIC_EnableIRQ(EXTI2_3_IRQn);
 //
-//	__NVIC_SetPriority(EXTI4_15_IRQn, 0);
-//	__NVIC_EnableIRQ(EXTI4_15_IRQn);
+	__NVIC_SetPriority(EXTI4_15_IRQn, 0);
+	__NVIC_EnableIRQ(EXTI4_15_IRQn);
 
 	return ret;
 }
@@ -157,6 +160,26 @@ bool ChangeLedMode(bool EnableFlag,TIM& tim)
 	LL_TIM_GenerateEvent_UPDATE(SamplingTimer);
 
 	return NewFlag;
+}
+
+
+bool CheckVoltage(AnalogConverter& adc)
+{
+	bool PowerFlag = true;
+	uint16_t value = adc.StartSoftConvert();
+
+	if(value < SystemUnits::GetUnderVoltageLimit())
+	{
+		PowerFlag = false;
+		SwitchOff();
+	}
+	else
+	{
+		PowerFlag = true;
+		SwitchOn();
+	}
+
+	return PowerFlag;
 }
 
 #include <string.h>

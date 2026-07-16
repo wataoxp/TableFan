@@ -19,12 +19,14 @@ namespace PinAssignment{
 			IndicatorPos	= Pin0,
 			ADCinPos		= Pin3,
 
-			PWMoutPos		= Pin4,
+			PWMoutPos		= Pin7,
 
 			LedEnablePos 	= Pin2,
 			LowDutyPos 		= Pin5,
 			MiddleDutyPos 	= Pin6,
 			HighDutyPos 	= Pin7,
+
+			SystemPos		= Pin14,
 
 			SwitchPos		= Pin11,
 		};
@@ -40,6 +42,8 @@ namespace PinAssignment{
 			MiddleDuty		= 1 << MiddleDutyPos,
 			HighDuty		= 1 << HighDutyPos,
 
+			MainSystem		= 1 << SystemPos,
+
 			LoadSwitch		= 1 << SwitchPos,
 		};
 
@@ -48,10 +52,12 @@ namespace PinAssignment{
 			LowDutyLine		= LL_EXTI_LINE_5,
 			MiddleDutyLine	= LL_EXTI_LINE_6,
 			HighDutyLine	= LL_EXTI_LINE_7,
+
+			SystemLine		= LL_EXTI_LINE_7,
 		};
 
 		enum Alternate{
-			PWMoutAF		= LL_GPIO_AF_4,
+			PWMoutAF		= LL_GPIO_AF_10,
 		};
 	};
 
@@ -60,6 +66,8 @@ namespace PinAssignment{
 }
 
 namespace TimerParameter{
+	TIM_TypeDef* const PWMTimer = TIM16;
+	GPIO_TypeDef* const PWMPort = GPIOB;
 	struct PWM{
 		PWM() = delete;
 
@@ -76,7 +84,7 @@ namespace TimerParameter{
 		};
 	};
 
-	TIM_TypeDef* const SamplingTimer = TIM16;
+	TIM_TypeDef* const SamplingTimer = TIM14;
 
 	struct Sample{
 		Sample() = delete;
@@ -84,7 +92,9 @@ namespace TimerParameter{
 		// 12M / 12000= 1ms.
 		enum Frequency{
 			Prescaler 		= 12000,
-			DefaultReload	= 60000,
+//			DefaultReload	= 60000,
+			DefaultReload	= 1000,
+
 			LedOnReload		= 200,
 		};
 	};
@@ -129,27 +139,28 @@ uint32_t ConfigRGBTimer(TIM& tim);
 void SleepMode(bool flag);
 uint32_t GetNewDuty(uint32_t command);
 bool ChangeLedMode(bool EnableFlag,TIM& tim);
+bool CheckVoltage(AnalogConverter& adc);
 
 uint32_t ItoA(char* string,uint16_t n);
 
-static inline void LedOn()
+inline void LedOn()
 {
 	GPIO_WRITE(GPIOA,PinAssignment::IOPin::IndicatorPos);
 }
 
-static inline void LedOff()
+inline void LedOff()
 {
 	GPIO_CLEAR(GPIOA,PinAssignment::IOPin::IndicatorPos);
 }
 
 // TCK108AF.CTRL=Low,Enable
 
-static inline void SwitchOn()
+inline void SwitchOn()
 {
 	GPIO_CLEAR(GPIOA,PinAssignment::IOPin::SwitchPos);
 }
 
-static inline void SwitchOff()
+inline void SwitchOff()
 {
 	GPIO_WRITE(GPIOA,PinAssignment::IOPin::SwitchPos);
 }
